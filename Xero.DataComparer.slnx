@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="Xero.DataComparer.Console/Xero.DataComparer.Console.csproj" />
+  <Project Path="Xero.DataComparer.Core/Xero.DataComparer.Core.csproj" />
+</Solution>
