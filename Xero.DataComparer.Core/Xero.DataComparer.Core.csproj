@@ -1,3 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet package metadata -->
+    <PackageId>Xero.DataComparer</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Youssef Bouha</Authors>
+    <Company>Youssef Bouha</Company>
+    <Product>Xero.DataComparer</Product>
+    <Title>Xero.DataComparer</Title>
+    <Description>High-performance generic list comparator for .NET. Compares two arbitrary lists of objects in a single parallel pass and returns structured, grid-bindable diff data (only-in-reference, only-in-target, and in-both-but-differing rows) instead of a pass/fail verdict. Built for non-regression testing and large-scale data reconciliation.</Description>
+    <PackageTags>comparer;diff;data-comparison;reconciliation;non-regression;nrt;list;collection;performance;parallel</PackageTags>
+    <Copyright>Copyright (c) Youssef Bouha</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ybouha/Xero.DataComparer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ybouha/Xero.DataComparer</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Build/quality settings for a published package -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- Suppress missing XML-doc warnings; remove if you want to enforce docs -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship the repo README inside the package -->
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
