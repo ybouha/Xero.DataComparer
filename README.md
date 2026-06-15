@@ -2,7 +2,7 @@
 
 **High-performance generic list comparator for .NET — built for non-regression testing and large-scale data reconciliation.**
 
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-net48%20%E2%80%93%20net10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Youssef%20Bouha-0A66C2?logo=linkedin)](https://www.linkedin.com/in/youssef-bouha-3311946/)
 
@@ -121,8 +121,15 @@ The exact same `CompareResult<T>` (and its `OnlyInReference` / `OnlyInTarget` sl
 
 ## Requirements
 
-- .NET 10 SDK
-- C# 13 / nullable reference types enabled
+The package multi-targets and runs on everything from **.NET Framework 4.8 to .NET 10**:
+
+- `net48` — .NET Framework 4.8
+- `netstandard2.0` — .NET Core 2.0–3.1, .NET 5/6/7/9
+- `net8.0` — .NET 8 (LTS)
+- `net10.0` — .NET 10
+
+On `net48` / `netstandard2.0` the package brings in `System.Text.Json` and an `IsExternalInit`
+polyfill so the same API works unchanged.
 
 ---
 

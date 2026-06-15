@@ -2,9 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- One package, every runtime from .NET Framework 4.8 to .NET 10.
+         netstandard2.0 covers the gaps (Core 2.0-3.1, .NET 5/6/7/9). -->
+    <TargetFrameworks>net48;netstandard2.0;net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Allow C# 10+ features (file-scoped namespaces, records, switch expressions)
+         on the down-level target frameworks. -->
+    <LangVersion>latest</LangVersion>
 
     <!-- NuGet package metadata -->
     <PackageId>Xero.DataComparer</PackageId>
@@ -32,8 +37,24 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- Modern targets: use the matching latest abstractions; System.Text.Json is in-box. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <!-- Down-level targets (net48 / netstandard2.0): pin LTS abstractions and pull in
+       System.Text.Json, which is not part of those frameworks. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <!-- Reference assemblies so net48 builds on machines/CI without a full .NET Framework install. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

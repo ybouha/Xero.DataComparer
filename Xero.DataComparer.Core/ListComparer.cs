@@ -195,7 +195,7 @@ public class ListComparer<T> where T : class, new()
 
         // Tick row: 0 ........ midpoint ........ end
         var axis = new char[BarWidth];
-        Array.Fill(axis, ' ');
+        for (int i = 0; i < axis.Length; i++) axis[i] = ' ';
         WriteAt(axis, 0, startTs);
         WriteAt(axis, BarWidth / 2 - midTs.Length / 2, midTs);
         WriteAt(axis, BarWidth - endTs.Length, endTs);
