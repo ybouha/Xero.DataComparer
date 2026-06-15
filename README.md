@@ -1,6 +1,6 @@
 # Xero.DataComparer
 
-**High-performance generic list comparator for .NET — built for non-regression testing and large-scale data reconciliation.**
+**High-performance generic list comparator for .NET built for non-regression testing and large-scale data reconciliation.**
 
 [![.NET](https://img.shields.io/badge/.NET-net48%20%E2%80%93%20net10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -43,14 +43,14 @@ Each "in-both-but-diff" row is laid out so a grid, a JSON serializer, or an inve
 | `Target_<Property>` | The value seen on the target side, **only for properties that actually differ**. |
 | `ComparedItems` | A `CoupleItem<T>` carrying the two original `T` objects so you can navigate to any other field on demand. |
 
-Because `CompareResult<T>` implements `ITypedList`, those flat rows light up automatically in any data-bound grid (DevExpress `GridControl`, WinForms `DataGridView`, …) — no view model, no manual column setup.
+Because `CompareResult<T>` implements `ITypedList`, those flat rows light up automatically in any data-bound grid (DevExpress `GridControl`, WinForms `DataGridView`, …) no view model, no manual column setup.
 
 ### Sample console output (from the `Xero.DataComparer.Console` demo)
 
 The included demo runs an NRT over **10,000,000 risk-indicator rows** and renders the three result slices as three separate tables, each driven by the descriptor-based contract a real DataGrid would walk:
 
-- **In both, differing** — columns come from `CompareResult<T>` via `ITypedList.GetItemProperties()`
-- **Only in reference** / **Only in target** — columns come from `TypeDescriptor.GetProperties(typeof(T))`, i.e. the same default column inference WinForms / WPF DataGrid / DevExpress GridControl do for any typed list.
+- **In both, differing** columns come from `CompareResult<T>` via `ITypedList.GetItemProperties()`
+- **Only in reference** / **Only in target** columns come from `TypeDescriptor.GetProperties(typeof(T))`, i.e. the same default column inference WinForms / WPF DataGrid / DevExpress GridControl do for any typed list.
 
 The console renderer is generic and knows nothing about the diff schema or the domain type:
 
@@ -65,7 +65,7 @@ a real DataGrid would walk:
   · only-in-reference   → TypeDescriptor.GetProperties(typeof(T))
   · only-in-target      → TypeDescriptor.GetProperties(typeof(T))
 
-─── In both, differing — top 5 of 20,000 ──────────────────────────────────────
+─── In both, differing top 5 of 20,000 ──────────────────────────────────────
 ┌────────────────┬────────────┬──────────────┬───────────────┬───────────────┬───────────────┬───────────────┐
 │ Key_TradeId    │ Key_Book   │ Key_AsOfDate │ Reference_PnL │ Target_PnL    │ Reference_VaR │ Target_VaR    │
 ├────────────────┼────────────┼──────────────┼───────────────┼───────────────┼───────────────┼───────────────┤
@@ -76,7 +76,7 @@ a real DataGrid would walk:
 │ TRD-009962045  │ GAS-NBP    │ 2026-04-30   │ -88,221.4400  │ -88,180.0021  │   4,902.1190  │   4,950.0080  │
 └────────────────┴────────────┴──────────────┴───────────────┴───────────────┴───────────────┴───────────────┘
 
-─── Only in reference — top 5 of 20,000 ───────────────────────────────────────
+─── Only in reference top 5 of 20,000 ───────────────────────────────────────
 ┌────────────────┬────────────┬────────────┬──────────────┬─────────────┬───────────┬──────────┬──────────┬─────────┐
 │ TradeId        │ Book       │ AsOfDate   │ PnL          │ VaR         │ Delta     │ Gamma    │ Vega     │ Theta   │
 ├────────────────┼────────────┼────────────┼──────────────┼─────────────┼───────────┼──────────┼──────────┼─────────┤
@@ -87,7 +87,7 @@ a real DataGrid would walk:
 │ TRD-009980005  │ IR-EU      │ 2026-04-30 │  71,015.6611 │   7,330.55… │ -498.2210 │   0.4710 │  44.1188 │ -2.8807 │
 └────────────────┴────────────┴────────────┴──────────────┴─────────────┴───────────┴──────────┴──────────┴─────────┘
 
-─── Only in target — top 5 of 20,000 ──────────────────────────────────────────
+─── Only in target top 5 of 20,000 ──────────────────────────────────────────
 ┌────────────────┬────────────┬────────────┬──────────────┬─────────────┬───────────┬──────────┬──────────┬─────────┐
 │ TradeId        │ Book       │ AsOfDate   │ PnL          │ VaR         │ Delta     │ Gamma    │ Vega     │ Theta   │
 ├────────────────┼────────────┼────────────┼──────────────┼─────────────┼───────────┼──────────┼──────────┼─────────┤
@@ -101,21 +101,21 @@ a real DataGrid would walk:
 
 The exact same `CompareResult<T>` (and its `OnlyInReference` / `OnlyInTarget` slices) could be assigned to a `DevExpress.XtraGrid.GridControl.DataSource`, a WPF `DataGrid.ItemsSource`, or a WinForms `DataGridView.DataSource` and produce three fully columnar views with zero extra code. The console renderer is just one consumer of the same descriptor contract.
 
-> See [`Xero.DataComparer.Console/Program.cs`](Xero.DataComparer.Console/Program.cs) — under 200 lines, including the data generator and the generic `ConsoleGrid` renderer.
+> See [`Xero.DataComparer.Console/Program.cs`](Xero.DataComparer.Console/Program.cs) under 200 lines, including the data generator and the generic `ConsoleGrid` renderer.
 
 ---
 
 ## Features
 
-- **Composite key matching.** Identify pairs across the two lists by any combination of properties — no need to write a custom `IEqualityComparer` per type.
-- **Structured diff data — not a verdict.** Differences come back as flat rows (`Key_*`, `Reference_*`, `Target_*`, plus the original paired objects). You see *which* row diverged, on *which* properties, with *what* values — ready to bind to any `ITypedList`-aware UI control (DevExpress `GridControl`, WinForms `DataGridView`), to serialize, or to pipe into an investigation pipeline.
+- **Composite key matching.** Identify pairs across the two lists by any combination of properties no need to write a custom `IEqualityComparer` per type.
+- **Structured diff data not a verdict.** Differences come back as flat rows (`Key_*`, `Reference_*`, `Target_*`, plus the original paired objects). You see *which* row diverged, on *which* properties, with *what* values ready to bind to any `ITypedList`-aware UI control (DevExpress `GridControl`, WinForms `DataGridView`), to serialize, or to pipe into an investigation pipeline.
 - **Compiled accessors.** Property getters are built once at construction time using `Expression.Lambda`, removing reflection from the hot path.
 - **Parallel execution.** Both reference and target indexes are built concurrently; the three result sets (only-in-reference, only-in-target, in-both-with-diff) are produced in parallel; per-pair property comparison is fan-out via PLINQ.
 - **Custom dual-indexed HashSet.** A purpose-built `HashSetComparer<T>` holds left and right hash structures using the same comparator, avoiding allocation churn when a row needs to be looked up in the opposite set.
 - **Memory-tight diff dictionary.** `PooledDictionary<TKey, TValue>` is sized exactly to the column count, never resizes during normal use, and uses linear scan (faster than hashing for the small entry counts of a per-row diff).
 - **Built-in instrumentation.** Each major phase is timed with a `Stopwatch` and logged; an ASCII Gantt chart is emitted to the logger so you can see the parallelism at work.
 - **Runtime type generation.** `DynamicTypeBuilder` can emit a CLR type from a `ColumnDef[]` schema using `System.Reflection.Emit`, useful when comparing query results whose schema is only known at runtime (works with Dapper).
-- **Single dependency.** Only `Microsoft.Extensions.Logging.Abstractions` — no third-party libraries, no source generators, no analyzers.
+- **Single dependency.** Only `Microsoft.Extensions.Logging.Abstractions` no third-party libraries, no source generators, no analyzers.
 
 ---
 
@@ -123,10 +123,10 @@ The exact same `CompareResult<T>` (and its `OnlyInReference` / `OnlyInTarget` sl
 
 The package multi-targets and runs on everything from **.NET Framework 4.8 to .NET 10**:
 
-- `net48` — .NET Framework 4.8
-- `netstandard2.0` — .NET Core 2.0–3.1, .NET 5/6/7/9
-- `net8.0` — .NET 8 (LTS)
-- `net10.0` — .NET 10
+- `net48` .NET Framework 4.8
+- `netstandard2.0` .NET Core 2.0–3.1, .NET 5/6/7/9
+- `net8.0` .NET 8 (LTS)
+- `net10.0` .NET 10
 
 On `net48` / `netstandard2.0` the package brings in `System.Text.Json` and an `IsExternalInit`
 polyfill so the same API works unchanged.
@@ -156,12 +156,12 @@ var comparer = new ListComparer<Trade>(
 
 CompareResult<Trade> result = await comparer.CompareList(reference, target);
 
-// 1) Counts — useful for a high-level NRT pass / fail signal
+// 1) Counts useful for a high-level NRT pass / fail signal
 Console.WriteLine($"Only in reference : {result.OnlyInReference?.Count ?? 0}");
 Console.WriteLine($"Only in target    : {result.OnlyInTarget?.Count    ?? 0}");
 Console.WriteLine($"In both, differing: {result.Count}");
 
-// 2) Actual diff DATA — the value the library brings on top of a hash check
+// 2) Actual diff DATA the value the library brings on top of a hash check
 foreach (var diff in result)
 {
     var tradeId = diff["Key_TradeId"];
@@ -210,7 +210,7 @@ A few choices that matter when the inputs grow into the millions:
 
 - **Reflection is paid once, not per row.** All getters are precompiled with `System.Linq.Expressions`; the per-row path is a delegate invocation.
 - **Pre-sized hash buckets.** `HashSetComparer<T>` is constructed with the known left/right counts and uses prime-sized buckets, eliminating the resize-and-rehash cost that a generic `HashSet<T>` would pay when filled in bulk.
-- **Linear-scan diff rows.** A diff dictionary holds at most `2 × propsCompared + keys + 1` entries — typically 10 to 30. For that range, a linear scan is faster than computing hash codes; `PooledDictionary` exploits that.
+- **Linear-scan diff rows.** A diff dictionary holds at most `2 × propsCompared + keys + 1` entries typically 10 to 30. For that range, a linear scan is faster than computing hash codes; `PooledDictionary` exploits that.
 - **No allocation in the inner equality loop.** The comparator's `Equals` and `GetHashCode` walk the precompiled getter list with no boxing beyond the `object` returned by the getter itself.
 - **Pair enumeration is iterator-based.** `OnlyInLeft`, `OnlyInRight`, and `InBoth` are `IEnumerable<>` yielding pipelines so the parallel consumers can start processing without waiting for full materialization.
 
@@ -236,7 +236,7 @@ A few choices that matter when the inputs grow into the millions:
 - **Non-regression testing of pricing / risk engines.** Compare yesterday's run against today's across thousands of trades, ignoring volatile fields (timestamps, run IDs).
 - **Cross-environment reconciliation.** Validate that a UAT environment and production return the same booking output for the same input.
 - **ETL validation.** Diff the source and the loaded data to confirm a migration has not corrupted records.
-- **Schema-late comparisons.** Compare two query results coming from different databases when the schema is only known at runtime — `DynamicTypeBuilder` produces a Dapper-friendly type and `ListComparer<T>` handles the rest.
+- **Schema-late comparisons.** Compare two query results coming from different databases when the schema is only known at runtime `DynamicTypeBuilder` produces a Dapper-friendly type and `ListComparer<T>` handles the rest.
 
 ---
 
@@ -254,13 +254,13 @@ A NuGet packaging target can be added by setting `<GeneratePackageOnBuild>true</
 
 ## License
 
-Released under the MIT License — see [LICENSE](LICENSE) for details.
+Released under the MIT License see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Author
 
-**Youssef Bouha** — Senior software architect, ENSIMAG, 18+ years on .NET front-to-back risk and pricing platforms.
+**Youssef Bouha** Senior software architect, ENSIMAG, 18+ years on .NET front-to-back risk and pricing platforms.
 
 🔗 [LinkedIn](https://www.linkedin.com/in/youssef-bouha-3311946/)
 
