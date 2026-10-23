@@ -5,7 +5,7 @@
 [![.NET](https://img.shields.io/badge/.NET-net48%20%E2%80%93%20net10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Youssef%20Bouha-0A66C2?logo=linkedin)](https://www.linkedin.com/in/youssef-bouha-3311946/)
-<img width="1184" height="789" alt="image" src="https://github.com/user-attachments/assets/93a81091-feae-45d3-95f2-246d9134c882" />
+<img width="1184" height="700" alt="image" src="https://github.com/user-attachments/assets/229be8ca-a6d7-418d-844b-6716dcea117d" />
 
 ---
 
