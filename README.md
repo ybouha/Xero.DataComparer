@@ -2,6 +2,7 @@
 
 **High-performance generic list comparator for .NET built for non-regression testing and large-scale data reconciliation.**
 
+[![NuGet](https://img.shields.io/nuget/v/Xero.DataComparer?logo=nuget)](https://www.nuget.org/packages/Xero.DataComparer)
 [![.NET](https://img.shields.io/badge/.NET-net48%20%E2%80%93%20net10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Youssef%20Bouha-0A66C2?logo=linkedin)](https://www.linkedin.com/in/youssef-bouha-3311946/)
@@ -241,15 +242,23 @@ A few choices that matter when the inputs grow into the millions:
 
 ---
 
+## Installation
+
+The package is available on [NuGet](https://www.nuget.org/packages/Xero.DataComparer):
+
+```bash
+dotnet add package Xero.DataComparer
+```
+
+---
+
 ## Building from source
 
 ```bash
-git clone https://github.com/<your-username>/Xero.DataComparer.git
+git clone https://github.com/ybouha/Xero.DataComparer.git
 cd Xero.DataComparer
 dotnet build -c Release
 ```
-
-A NuGet packaging target can be added by setting `<GeneratePackageOnBuild>true</GeneratePackageOnBuild>` in the csproj.
 
 ---
 
