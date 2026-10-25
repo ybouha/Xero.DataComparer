@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Lightweight dictionary backed by two parallel arrays sized to exact capacity at construction.
-/// No internal resizing, no external dependencies.
+/// No internal resizing in normal use, no external dependencies.
 /// Only the operations used by the comparison pipeline are implemented;
 /// lookup is a linear scan which is faster than hashing for the small entry counts used here.
 /// </summary>
@@ -16,6 +16,7 @@ public sealed class PooledDictionary<TKey, TValue> where TKey : notnull
 
     public PooledDictionary(int capacity = 16)
     {
+        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity), capacity, "Capacity cannot be negative.");
         _keys = new TKey[capacity];
         _values = new TValue[capacity];
     }
@@ -56,11 +57,12 @@ public sealed class PooledDictionary<TKey, TValue> where TKey : notnull
         return false;
     }
 
+    /// <summary>Adds an entry; like <see cref="Dictionary{TKey, TValue}.Add"/>, throws when the key is already present.</summary>
     public void Add(TKey key, TValue value)
     {
-        // Guard: skip silently if key already present (parallel paths can produce duplicates)
         for (int i = 0; i < _count; i++)
-            if (_comparer.Equals(_keys[i], key)) return;
+            if (_comparer.Equals(_keys[i], key))
+                throw new ArgumentException($"An entry with the key {key} is already present.", nameof(key));
 
         if (_count == _keys.Length) Grow();
         _keys[_count] = key;
@@ -70,7 +72,8 @@ public sealed class PooledDictionary<TKey, TValue> where TKey : notnull
 
     private void Grow()
     {
-        Array.Resize(ref _keys, _keys.Length * 2);
-        Array.Resize(ref _values, _values.Length * 2);
+        int size = Math.Max(4, _keys.Length * 2);
+        Array.Resize(ref _keys, size);
+        Array.Resize(ref _values, size);
     }
 }

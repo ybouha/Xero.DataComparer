@@ -1,32 +1,29 @@
 using System.Diagnostics;
-using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 
 namespace Xero.DataComparer.Core;
 
-public class ListComparer<T> where T : class, new()
+/// <summary>
+/// Compares two lists of <typeparamref name="T"/> matched on key properties. An instance holds only its configuration,
+/// so it can run several comparisons at the same time.
+/// </summary>
+public class ListComparer<T> where T : class
 {
-    // Store name and getter for iterating and creating the diff dictionary
-    private readonly List<(string Name, Func<T, object> Getter)> _keyPropertiesData;
-    private readonly List<(string Name, Func<T, object> Getter)> _propertiesToCompareData;
+    private const string ComparedItemsColumn = "ComparedItems";
+
+    private readonly PropertyAccessor<T>[] _keys;
+    private readonly PropertyAccessor<T>[] _compared;
+    // Column names built once, not per diff row
+    private readonly string[] _keyColumns;
+    private readonly string[] _referenceColumns;
+    private readonly string[] _targetColumns;
+    private readonly (string Name, Type Type)[] _columns;
     // Max entries a diff dict can hold: (Reference_ + Target_) per prop + Key_ per key + "ComparedItems"
-    private int _diffCapacity;
+    private readonly int _diffCapacity;
 
-    private readonly EqualityComparerEx<T> keyEqComparer;
+    private readonly EqualityComparerEx<T> _keyComparer;
     private readonly ILogger<ListComparer<T>>? _logger;
-
-    // Gantt Chart Data
-    public class TaskInfo
-    {
-        public string Name = string.Empty;
-        public long Start;   // in ms
-        public long End;
-        public long Duration => End - Start;
-    }
-
-    private List<TaskInfo> _taskTimings = new();
-    private Stopwatch _globalStopwatch = new();
 
     public ListComparer(
         List<string> keyProperties,
@@ -36,145 +33,124 @@ public class ListComparer<T> where T : class, new()
         _logger = logger;
 
         var distinctKeys = keyProperties.Distinct().ToList();
-        _keyPropertiesData = new List<(string Name, Func<T, object> Getter)>(distinctKeys.Count);
-        var keyGetters = new List<Func<T, object>>(distinctKeys.Count);
-
-        foreach (var propName in distinctKeys)
-        {
-             var getter = CreatePropertyGetter(propName);
-             _keyPropertiesData.Add((propName, getter));
-             keyGetters.Add(getter);
-        }
+        _keys = distinctKeys.Select(PropertyAccessor<T>.Create).ToArray();
+        _keyComparer = new EqualityComparerEx<T>(_keys);
 
         // Use HashSet<string> for O(1) property name lookups during filtering
         var ignoreSet = new HashSet<string>(ignoreProperties);
         var keySet = new HashSet<string>(distinctKeys);
 
-        var allProps = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                                .Where(p => p.CanRead && p.GetIndexParameters().Length == 0);
+        _compared = typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                             .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
+                             .Where(p => !ignoreSet.Contains(p.Name) && !keySet.Contains(p.Name))
+                             .Select(PropertyAccessor<T>.Create)
+                             .ToArray();
 
-        _propertiesToCompareData = new List<(string Name, Func<T, object> Getter)>();
+        _keyColumns = _keys.Select(k => $"Key_{k.Name}").ToArray();
+        _referenceColumns = _compared.Select(p => $"Reference_{p.Name}").ToArray();
+        _targetColumns = _compared.Select(p => $"Target_{p.Name}").ToArray();
 
-        foreach (var prop in allProps)
+        var columns = new List<(string Name, Type Type)>();
+        columns.AddRange(_keys.Select((k, i) => (_keyColumns[i], k.Type)));
+        for (int i = 0; i < _compared.Length; i++)
         {
-            if (ignoreSet.Contains(prop.Name)) continue;
-            if (keySet.Contains(prop.Name)) continue;
-
-            _propertiesToCompareData.Add((prop.Name, CreatePropertyGetter(prop)));
+            columns.Add((_referenceColumns[i], _compared[i].Type));
+            columns.Add((_targetColumns[i], _compared[i].Type));
         }
-
-        keyEqComparer = new EqualityComparerEx<T>(keyGetters);
-        _diffCapacity = _propertiesToCompareData.Count * 2 + _keyPropertiesData.Count + 1;
+        columns.Add((ComparedItemsColumn, typeof(CoupleItem<T>)));
+        _columns = columns.ToArray();
+        _diffCapacity = _columns.Length;
     }
 
-    private Func<T, object> CreatePropertyGetter(string propertyName)
+    public async Task<CompareResult<T>> CompareListAsync(List<T> referenceItems, List<T> targetItems)
     {
-        var propInfo = typeof(T).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-        if (propInfo == null) throw new ArgumentException($"Property {propertyName} not found on {typeof(T).Name}");
-        return CreatePropertyGetter(propInfo);
-    }
+        if (referenceItems is null) throw new ArgumentNullException(nameof(referenceItems));
+        if (targetItems is null) throw new ArgumentNullException(nameof(targetItems));
 
-    private Func<T, object> CreatePropertyGetter(PropertyInfo propInfo)
-    {
-        var parameter = Expression.Parameter(typeof(T), "i");
-        var propertyAccess = Expression.Property(parameter, propInfo);
-        var conversion = Expression.Convert(propertyAccess, typeof(object));
-        return Expression.Lambda<Func<T, object>>(conversion, parameter).Compile();
-    }
-
-    private async Task MeasureTimeAsync(Func<Task> taskFunc, string action)
-    {
-        long start = _globalStopwatch.ElapsedMilliseconds;
-
-        var sw = new Stopwatch();
-        sw.Start();
-        await taskFunc();
-        sw.Stop();
-
-        long end = _globalStopwatch.ElapsedMilliseconds;
-
-        lock (_taskTimings)
-        {
-            _taskTimings.Add(new TaskInfo { Name = action, Start = start, End = end });
-        }
-
-        _logger?.LogInformation("  {Action} completed in {Elapsed:F2}s", action, sw.Elapsed.TotalSeconds);
-    }
-
-    private TResult MeasureTime<TResult>(Func<TResult> taskFunc, string action)
-    {
-        long start = _globalStopwatch.ElapsedMilliseconds;
-
-        var sw = new Stopwatch();
-        sw.Start();
-        TResult result = taskFunc();
-        sw.Stop();
-
-        long end = _globalStopwatch.ElapsedMilliseconds;
-
-        lock (_taskTimings)
-        {
-            _taskTimings.Add(new TaskInfo { Name = action, Start = start, End = end });
-        }
-
-        _logger?.LogInformation("  {Action} completed in {Elapsed:F2}s", action, sw.Elapsed.TotalSeconds);
-        return result;
-    }
-
-    public async Task<CompareResult<T>> CompareList(List<T> referenceItems, List<T> targetItems)
-    {
-        _globalStopwatch = Stopwatch.StartNew();
-        _taskTimings.Clear();
+        // Per call, so concurrent comparisons do not share their timings.
+        var clock = Stopwatch.StartNew();
+        var timings = new List<TaskTiming>();
 
         _logger?.LogInformation(
             "Starting comparison — Reference: {RefCount:N0} rows, Target: {TgtCount:N0} rows",
             referenceItems.Count, targetItems.Count);
 
-        List<T>? onlyInTarget    = null;
-        List<T>? onlyInReference = null;
-        List<PooledDictionary<string, object>>? inBothButDiff = new();
+        var comparerSet = new HashSetComparer<T>(referenceItems.Count, targetItems.Count, _keyComparer);
 
-        var comparerSet = new HashSetComparer<T>(referenceItems.Count, targetItems.Count, keyEqComparer);
+        var duplicates = await Task.WhenAll(
+            Task.Run(() => MeasureTime(() => AddAll(referenceItems, comparerSet.AddLeftItem), "Build Ref HashSet", clock, timings)),
+            Task.Run(() => MeasureTime(() => AddAll(targetItems, comparerSet.AddRightItem), "Build Target HashSet", clock, timings))
+        ).ConfigureAwait(false); // the rest runs on the thread pool, never on the caller's UI thread
 
-        var sw = Stopwatch.StartNew();
-
-        await Task.WhenAll(
-            MeasureTimeAsync(() => Task.Run(() => referenceItems.ForEach(x => comparerSet.AddLeftItem(x))),  "Build Ref HashSet"),
-            MeasureTimeAsync(() => Task.Run(() => targetItems.ForEach(x => comparerSet.AddRightItem(x))), "Build Target HashSet")
-        );
+        List<T> onlyInTarget = [];
+        List<T> onlyInReference = [];
+        List<PooledDictionary<string, object?>> inBothButDiff = [];
 
         Parallel.Invoke(
             new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-            () => onlyInTarget    = MeasureTime(() => comparerSet.OnlyInRight().ToList(),         "Get OnlyInTarget"),
-            () => onlyInReference = MeasureTime(() => comparerSet.OnlyInLeft().ToList(),          "Get OnlyInReference"),
-            () => inBothButDiff   = MeasureTime(() => CompareInBoth(comparerSet.InBoth()),        "Compare InBoth")
+            () => onlyInTarget    = MeasureTime(() => comparerSet.OnlyInRight().ToList(),  "Get OnlyInTarget",    clock, timings),
+            () => onlyInReference = MeasureTime(() => comparerSet.OnlyInLeft().ToList(),   "Get OnlyInReference", clock, timings),
+            () => inBothButDiff   = MeasureTime(() => CompareInBoth(comparerSet.InBoth()), "Compare InBoth",      clock, timings)
         );
 
-        var result = new CompareResult<T>(inBothButDiff)
+        var result = new CompareResult<T>(inBothButDiff, _columns)
         {
-            OnlyInReference = onlyInReference,
-            OnlyInTarget    = onlyInTarget
+            OnlyInReference       = onlyInReference,
+            OnlyInTarget          = onlyInTarget,
+            DuplicatesInReference = duplicates[0],
+            DuplicatesInTarget    = duplicates[1],
+            Timings               = timings.OrderBy(t => t.Start).ToArray(),
         };
 
-        sw.Stop();
         _logger?.LogInformation(
             "Comparison finished in {Elapsed:F2}s — InBothButDiff: {Diff:N0}, OnlyInRef: {OnlyRef:N0}, OnlyInTgt: {OnlyTgt:N0}",
-            sw.Elapsed.TotalSeconds,
+            clock.Elapsed.TotalSeconds,
             result.Count,
-            result.OnlyInReference?.Count ?? 0,
-            result.OnlyInTarget?.Count ?? 0);
+            result.OnlyInReference.Count,
+            result.OnlyInTarget.Count);
 
-        LogGantt(_taskTimings);
+        if (result.DuplicatesInReference.Count + result.DuplicatesInTarget.Count > 0)
+            _logger?.LogWarning(
+                "Duplicate keys left out of the comparison — Reference: {DupRef:N0}, Target: {DupTgt:N0}",
+                result.DuplicatesInReference.Count,
+                result.DuplicatesInTarget.Count);
+
+        LogGantt(result.Timings);
 
         return result;
     }
 
-    private void LogGantt(List<TaskInfo> tasks)
+    /// <summary>Adds the items to one side of the set; returns those whose key is already there.</summary>
+    private static List<T> AddAll(List<T> items, Func<T, bool> add)
     {
-        if (tasks.Count == 0) return;
+        var duplicates = new List<T>();
+        foreach (var item in items)
+            if (!add(item)) duplicates.Add(item);
+        return duplicates;
+    }
 
-        long minTime       = tasks.Min(t => t.Start);
-        long maxTime       = tasks.Max(t => t.End);
+    private TResult MeasureTime<TResult>(Func<TResult> taskFunc, string action, Stopwatch clock, List<TaskTiming> timings)
+    {
+        var start = clock.Elapsed;
+        TResult result = taskFunc();
+        var end = clock.Elapsed;
+
+        lock (timings)
+        {
+            timings.Add(new TaskTiming(action, start, end));
+        }
+
+        _logger?.LogInformation("  {Action} completed in {Elapsed:F2}s", action, (end - start).TotalSeconds);
+        return result;
+    }
+
+    private void LogGantt(IReadOnlyList<TaskTiming> tasks)
+    {
+        if (tasks.Count == 0 || _logger is null || !_logger.IsEnabled(LogLevel.Information)) return;
+
+        long Ms(TimeSpan t) => (long)t.TotalMilliseconds;
+        long minTime       = tasks.Min(t => Ms(t.Start));
+        long maxTime       = tasks.Max(t => Ms(t.End));
         long totalDuration = Math.Max(1, maxTime - minTime);
 
         const int BarWidth   = 60;
@@ -204,10 +180,11 @@ public class ListComparer<T> where T : class, new()
         sb.Append(pad).Append('├').Append(new string('─', BarWidth)).AppendLine("┤");
 
         // ── One row per task — horizontal histogram of (idle | running | idle) ─
-        foreach (var task in tasks.OrderBy(t => t.Start))
+        foreach (var task in tasks)
         {
-            int startPos    = (int)((task.Start - minTime) * scale);
-            int durationLen = Math.Max(1, (int)(task.Duration * scale));
+            long duration   = Ms(task.Duration);
+            int startPos    = (int)((Ms(task.Start) - minTime) * scale);
+            int durationLen = Math.Max(1, (int)(duration * scale));
             if (startPos + durationLen > BarWidth) durationLen = BarWidth - startPos;
             int trailing    = BarWidth - startPos - durationLen;
 
@@ -217,13 +194,13 @@ public class ListComparer<T> where T : class, new()
             sb.Append(new string('█', durationLen));
             sb.Append(new string('░', trailing));
             sb.Append('│');
-            sb.AppendLine($" {task.Duration,6:N0} ms  ({100.0 * task.Duration / totalDuration,4:F1}%)");
+            sb.AppendLine($" {duration,6:N0} ms  ({100.0 * duration / totalDuration,4:F1}%)");
         }
 
         sb.Append(pad).Append('└').Append(new string('─', BarWidth)).AppendLine("┘");
         sb.Append($"Total wall-clock: {totalDuration:N0} ms  ·  Tasks: {tasks.Count}");
 
-        _logger?.LogInformation("{GanttChart}", sb.ToString());
+        _logger.LogInformation("{GanttChart}", sb.ToString());
 
         // Local helper: paste `text` into `buffer` at `offset`, clamped.
         static void WriteAt(char[] buffer, int offset, string text)
@@ -234,7 +211,7 @@ public class ListComparer<T> where T : class, new()
         }
     }
 
-    private List<PooledDictionary<string, object>> CompareInBoth(IEnumerable<(T, T)> inBothEnumerator)
+    private List<PooledDictionary<string, object?>> CompareInBoth(IEnumerable<(T, T)> inBothEnumerator)
     {
         return inBothEnumerator
             .AsParallel()
@@ -245,36 +222,30 @@ public class ListComparer<T> where T : class, new()
             .ToList();
     }
 
-    private PooledDictionary<string, object>? CompareProperties(T referenceItem, T targetItem)
+    private PooledDictionary<string, object?>? CompareProperties(T referenceItem, T targetItem)
     {
-        PooledDictionary<string, object>? diff = null;
+        PooledDictionary<string, object?>? diff = null;
 
-        for (int i = 0; i < _propertiesToCompareData.Count; i++)
+        for (int i = 0; i < _compared.Length; i++)
         {
-            var propName = _propertiesToCompareData[i].Name;
-            var getter   = _propertiesToCompareData[i].Getter;
+            // Typed comparison: the values are boxed only when they differ
+            var property = _compared[i];
+            if (property.AreEqual(referenceItem, targetItem)) continue;
 
-            var referenceValue = getter(referenceItem);
-            var targetValue    = getter(targetItem);
+            diff ??= new PooledDictionary<string, object?>(_diffCapacity);
 
-            if (Equals(referenceValue, targetValue)) continue;
-
-            if (diff == null) diff = new PooledDictionary<string, object>(_diffCapacity);
-
-            diff.Add($"Reference_{propName}", referenceValue);
-            diff.Add($"Target_{propName}",    targetValue);
+            diff.Add(_referenceColumns[i], property.Get(referenceItem));
+            diff.Add(_targetColumns[i],    property.Get(targetItem));
         }
 
         if (diff == null) return null;
 
-        for (int i = 0; i < _keyPropertiesData.Count; i++)
+        for (int i = 0; i < _keys.Length; i++)
         {
-            var propName = _keyPropertiesData[i].Name;
-            var getter   = _keyPropertiesData[i].Getter;
-            diff.Add($"Key_{propName}", getter(referenceItem));
+            diff.Add(_keyColumns[i], _keys[i].Get(referenceItem));
         }
 
-        diff.Add("ComparedItems", new CoupleItem<T>(referenceItem, targetItem));
+        diff.Add(ComparedItemsColumn, new CoupleItem<T>(referenceItem, targetItem));
         return diff;
     }
 }

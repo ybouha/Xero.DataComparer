@@ -35,11 +35,11 @@ var comparer = new ListComparer<RiskIndicator>(
     ignoreProperties: new() { "LastUpdated", "RunId" },
     logger:           loggerFactory.CreateLogger<ListComparer<RiskIndicator>>());
 
-CompareResult<RiskIndicator> result = await comparer.CompareList(reference, target);
+CompareResult<RiskIndicator> result = await comparer.CompareListAsync(reference, target);
 
 Console.WriteLine();
-Console.WriteLine($"Only in reference  : {result.OnlyInReference?.Count ?? 0,8:N0}   (expected {OnlyInReference,6:N0})");
-Console.WriteLine($"Only in target     : {result.OnlyInTarget?.Count    ?? 0,8:N0}   (expected {OnlyInTarget,6:N0})");
+Console.WriteLine($"Only in reference  : {result.OnlyInReference.Count,8:N0}   (expected {OnlyInReference,6:N0})");
+Console.WriteLine($"Only in target     : {result.OnlyInTarget.Count,8:N0}   (expected {OnlyInTarget,6:N0})");
 Console.WriteLine($"In both, differing : {result.Count,8:N0}   (expected {InBothButDiff,6:N0})");
 Console.WriteLine();
 Console.WriteLine("Three result tables, each rendered through the same descriptor-based path");
@@ -56,13 +56,13 @@ ConsoleGrid.Render(
 ConsoleGrid.Render(
     source: result.OnlyInReference,
     topN:   TopN,
-    title:  $"Only in reference — top {TopN} of {result.OnlyInReference?.Count ?? 0:N0}",
+    title:  $"Only in reference — top {TopN} of {result.OnlyInReference.Count:N0}",
     excludeProperties: ["LastUpdated", "RunId"]);
 
 ConsoleGrid.Render(
     source: result.OnlyInTarget,
     topN:   TopN,
-    title:  $"Only in target — top {TopN} of {result.OnlyInTarget?.Count ?? 0:N0}",
+    title:  $"Only in target — top {TopN} of {result.OnlyInTarget.Count:N0}",
     excludeProperties: ["LastUpdated", "RunId"]);
 
 
@@ -220,6 +220,8 @@ internal static class ConsoleGrid
 
         // 2. Materialize the cells we're going to print so we can size each column.
         var rows  = source.Cast<object>().Take(topN).ToList();
+        //    A diff row holds only the properties that differ: drop the columns empty in every printed row.
+        columns   = columns.Where(c => rows.Any(row => c.GetValue(row) is not null)).ToList();
         var cells = rows.Select(row => columns.Select(c => Format(c.GetValue(row))).ToArray()).ToList();
         var widths = columns.Select((c, i) =>
             Math.Max(c.Name.Length, cells.Max(r => r[i].Length))).ToArray();

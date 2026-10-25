@@ -6,4 +6,6 @@
   </Folder>
   <Project Path="Xero.DataComparer.Console/Xero.DataComparer.Console.csproj" />
   <Project Path="Xero.DataComparer.Core/Xero.DataComparer.Core.csproj" />
+  <Project Path="Xero.DataComparer.UI/Xero.DataComparer.UI.csproj" />
+  <Project Path="Xero.DataComparer.Tests/Xero.DataComparer.Tests.csproj" />
 </Solution>

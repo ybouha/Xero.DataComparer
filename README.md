@@ -6,7 +6,10 @@
 [![.NET](https://img.shields.io/badge/.NET-net48%20%E2%80%93%20net10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Youssef%20Bouha-0A66C2?logo=linkedin)](https://www.linkedin.com/in/youssef-bouha-3311946/)
-<img width="1184" height="700" alt="image" src="https://github.com/user-attachments/assets/229be8ca-a6d7-418d-844b-6716dcea117d" />
+
+![Xero.DataComparer WinForms demo: 1,000,000 vs 1,000,000 risk indicators compared in 681 ms](docs/ui-screenshot.png)
+
+*The `Xero.DataComparer.UI` demo: two lists of 1,000,000 risk indicators compared in 681 ms, with the gaps by kind, the property-level differences and the timeline of the parallel steps.*
 
 ---
 
@@ -34,7 +37,8 @@ The result is **not a boolean**. It is a fully populated [`CompareResult<T>`](Xe
 |---|---|---|
 | `OnlyInReference` | `List<T>` | Whole original objects that exist only on the reference side. |
 | `OnlyInTarget` | `List<T>` | Whole original objects that exist only on the target side. |
-| `result` itself (flat rows) | `List<PooledDictionary<string, object>>` | One row per pair where the keys match but at least one compared property disagrees. |
+| `DuplicatesInReference` / `DuplicatesInTarget` | `List<T>` | Items whose key was already seen on the same side. They are left out of the comparison but never silently lost. |
+| `result` itself (flat rows) | `List<PooledDictionary<string, object?>>` | One row per pair where the keys match but at least one compared property disagrees. |
 
 Each "in-both-but-diff" row is laid out so a grid, a JSON serializer, or an investigation script can consume it directly:
 
@@ -45,7 +49,9 @@ Each "in-both-but-diff" row is laid out so a grid, a JSON serializer, or an inve
 | `Target_<Property>` | The value seen on the target side, **only for properties that actually differ**. |
 | `ComparedItems` | A `CoupleItem<T>` carrying the two original `T` objects so you can navigate to any other field on demand. |
 
-Because `CompareResult<T>` implements `ITypedList`, those flat rows light up automatically in any data-bound grid (DevExpress `GridControl`, WinForms `DataGridView`, …) no view model, no manual column setup.
+Because `CompareResult<T>` implements `ITypedList`, those flat rows light up automatically in any data-bound grid (DevExpress `GridControl`, WinForms `DataGridView`, …), no view model, no manual column setup. The columns are derived from `T` (every key and every compared property, typed), so they are the same whatever differences were found; they are read-only.
+
+`result.Timings` holds the start and end of each step of the comparison (`TaskTiming`), for your own instrumentation.
 
 ### Sample console output (from the `Xero.DataComparer.Console` demo)
 
@@ -103,21 +109,22 @@ a real DataGrid would walk:
 
 The exact same `CompareResult<T>` (and its `OnlyInReference` / `OnlyInTarget` slices) could be assigned to a `DevExpress.XtraGrid.GridControl.DataSource`, a WPF `DataGrid.ItemsSource`, or a WinForms `DataGridView.DataSource` and produce three fully columnar views with zero extra code. The console renderer is just one consumer of the same descriptor contract.
 
-> See [`Xero.DataComparer.Console/Program.cs`](Xero.DataComparer.Console/Program.cs) under 200 lines, including the data generator and the generic `ConsoleGrid` renderer.
+> See [`Xero.DataComparer.Console/Program.cs`](Xero.DataComparer.Console/Program.cs), under 300 lines, including the data generator and the generic `ConsoleGrid` renderer (which leaves out the columns empty in every printed row).
 
 ---
 
 ## Features
 
-- **Composite key matching.** Identify pairs across the two lists by any combination of properties no need to write a custom `IEqualityComparer` per type.
-- **Structured diff data not a verdict.** Differences come back as flat rows (`Key_*`, `Reference_*`, `Target_*`, plus the original paired objects). You see *which* row diverged, on *which* properties, with *what* values ready to bind to any `ITypedList`-aware UI control (DevExpress `GridControl`, WinForms `DataGridView`), to serialize, or to pipe into an investigation pipeline.
-- **Compiled accessors.** Property getters are built once at construction time using `Expression.Lambda`, removing reflection from the hot path.
+- **Composite key matching.** Identify pairs across the two lists by any combination of properties, no need to write a custom `IEqualityComparer` per type.
+- **Structured diff data, not a verdict.** Differences come back as flat rows (`Key_*`, `Reference_*`, `Target_*`, plus the original paired objects). You see *which* row diverged, on *which* properties, with *what* values: ready to bind to any `ITypedList`-aware UI control (DevExpress `GridControl`, WinForms `DataGridView`), to serialize, or to pipe into an investigation pipeline.
+- **Compiled, typed accessors.** Property getters are built once at construction time using `Expression.Lambda`, removing reflection from the hot path. Keys and compared properties are hashed and compared on their typed value (`EqualityComparer<TProperty>.Default`): nothing is boxed unless a value differs.
+- **Duplicate keys reported.** An item whose key already appears on its side goes to `DuplicatesInReference` / `DuplicatesInTarget` instead of disappearing from the result.
 - **Parallel execution.** Both reference and target indexes are built concurrently; the three result sets (only-in-reference, only-in-target, in-both-with-diff) are produced in parallel; per-pair property comparison is fan-out via PLINQ.
 - **Custom dual-indexed HashSet.** A purpose-built `HashSetComparer<T>` holds left and right hash structures using the same comparator, avoiding allocation churn when a row needs to be looked up in the opposite set.
 - **Memory-tight diff dictionary.** `PooledDictionary<TKey, TValue>` is sized exactly to the column count, never resizes during normal use, and uses linear scan (faster than hashing for the small entry counts of a per-row diff).
-- **Built-in instrumentation.** Each major phase is timed with a `Stopwatch` and logged; an ASCII Gantt chart is emitted to the logger so you can see the parallelism at work.
-- **Runtime type generation.** `DynamicTypeBuilder` can emit a CLR type from a `ColumnDef[]` schema using `System.Reflection.Emit`, useful when comparing query results whose schema is only known at runtime (works with Dapper).
-- **Single dependency.** Only `Microsoft.Extensions.Logging.Abstractions` no third-party libraries, no source generators, no analyzers.
+- **Built-in instrumentation.** Each major phase is timed, returned in `result.Timings` and logged; an ASCII Gantt chart is emitted to the logger so you can see the parallelism at work.
+- **Thread-safe.** A `ListComparer<T>` only holds its configuration: one instance can run several comparisons at the same time.
+- **Single dependency.** Only `Microsoft.Extensions.Logging.Abstractions`, no third-party libraries, no source generators, no analyzers.
 
 ---
 
@@ -156,12 +163,13 @@ var comparer = new ListComparer<Trade>(
     keyProperties:    new List<string> { "TradeId" },
     ignoreProperties: new List<string> { "LastModified" });
 
-CompareResult<Trade> result = await comparer.CompareList(reference, target);
+CompareResult<Trade> result = await comparer.CompareListAsync(reference, target);
 
-// 1) Counts useful for a high-level NRT pass / fail signal
-Console.WriteLine($"Only in reference : {result.OnlyInReference?.Count ?? 0}");
-Console.WriteLine($"Only in target    : {result.OnlyInTarget?.Count    ?? 0}");
+// 1) Counts, useful for a high-level NRT pass / fail signal
+Console.WriteLine($"Only in reference : {result.OnlyInReference.Count}");
+Console.WriteLine($"Only in target    : {result.OnlyInTarget.Count}");
 Console.WriteLine($"In both, differing: {result.Count}");
+Console.WriteLine($"Duplicate keys    : {result.DuplicatesInReference.Count + result.DuplicatesInTarget.Count}");
 
 // 2) Actual diff DATA the value the library brings on top of a hash check
 foreach (var diff in result)
@@ -198,11 +206,11 @@ foreach (var diff in result)
                         CompareResult<T>
 ```
 
-1. The user-supplied **key property names** are resolved once into compiled `Func<T, object>` getters.
-2. An `EqualityComparerEx<T>` is built around those getters and used as the shared comparer for both the left and the right hash sets.
-3. The two indexes are populated in parallel via `Task.WhenAll`.
+1. The user-supplied **key property names** and the compared properties are resolved once into compiled, typed accessors (getter, equality, hash code).
+2. An `EqualityComparerEx<T>` is built around the key accessors and used as the shared comparer for both the left and the right hash sets.
+3. The two indexes are populated in parallel via `Task.WhenAll`; an item whose key is already in its index is reported as a duplicate.
 4. The three result categories are produced with `Parallel.Invoke`; the per-pair property comparison is itself parallelized with `AsParallel().WithDegreeOfParallelism(Environment.ProcessorCount)`.
-5. Each phase is timed and rendered as an ASCII Gantt chart through the supplied `ILogger<>`.
+5. Each phase is timed, returned in `CompareResult<T>.Timings` and rendered as an ASCII Gantt chart through the supplied `ILogger<>`.
 
 ---
 
@@ -211,9 +219,10 @@ foreach (var diff in result)
 A few choices that matter when the inputs grow into the millions:
 
 - **Reflection is paid once, not per row.** All getters are precompiled with `System.Linq.Expressions`; the per-row path is a delegate invocation.
+- **Hash codes are computed once.** Each item's hash code is stored when it is added to its index and reused to look it up in the other index.
 - **Pre-sized hash buckets.** `HashSetComparer<T>` is constructed with the known left/right counts and uses prime-sized buckets, eliminating the resize-and-rehash cost that a generic `HashSet<T>` would pay when filled in bulk.
-- **Linear-scan diff rows.** A diff dictionary holds at most `2 × propsCompared + keys + 1` entries typically 10 to 30. For that range, a linear scan is faster than computing hash codes; `PooledDictionary` exploits that.
-- **No allocation in the inner equality loop.** The comparator's `Equals` and `GetHashCode` walk the precompiled getter list with no boxing beyond the `object` returned by the getter itself.
+- **Linear-scan diff rows.** A diff dictionary holds at most `2 × propsCompared + keys + 1` entries, typically 10 to 30. For that range, a linear scan is faster than computing hash codes; `PooledDictionary` exploits that. The column names are built once, not per row.
+- **No allocation in the inner equality loop.** Keys and properties are compared and hashed on their typed values; only the values of a property that differs are boxed, into its diff row.
 - **Pair enumeration is iterator-based.** `OnlyInLeft`, `OnlyInRight`, and `InBoth` are `IEnumerable<>` yielding pipelines so the parallel consumers can start processing without waiting for full materialization.
 
 ---
@@ -225,10 +234,10 @@ A few choices that matter when the inputs grow into the millions:
 | `ListComparer<T>` | Entry point. Configured with key + ignored property names. |
 | `CompareResult<T>` | Output: differing pairs as flat rows + only-in-reference + only-in-target. Implements `ITypedList`. |
 | `HashSetComparer<T>` | Dual hash-indexed structure powering `OnlyIn*` / `InBoth` enumerations. |
-| `EqualityComparerEx<T>` | `IEqualityComparer<T>` derived from a list of getters (composite key). |
+| `EqualityComparerEx<T>` | `IEqualityComparer<T>` built from key property names (composite key), typed and without boxing. |
 | `PooledDictionary<TKey, TValue>` | Lightweight, exact-capacity dictionary used for diff rows. |
 | `CoupleItem<T>` | Holds the original `(reference, target)` pair alongside the diff row. |
-| `DynamicTypeBuilder` / `ColumnDef` | Emit a CLR type at runtime from a column schema, for schema-late comparisons (Dapper, ad-hoc SQL). |
+| `TaskTiming` | Start, end and duration of one step of the comparison (`CompareResult<T>.Timings`). |
 | `DynamicPropertyDescriptor` | Backs the `ITypedList` integration so dynamic columns are visible to UI grids. |
 
 ---
@@ -238,7 +247,6 @@ A few choices that matter when the inputs grow into the millions:
 - **Non-regression testing of pricing / risk engines.** Compare yesterday's run against today's across thousands of trades, ignoring volatile fields (timestamps, run IDs).
 - **Cross-environment reconciliation.** Validate that a UAT environment and production return the same booking output for the same input.
 - **ETL validation.** Diff the source and the loaded data to confirm a migration has not corrupted records.
-- **Schema-late comparisons.** Compare two query results coming from different databases when the schema is only known at runtime `DynamicTypeBuilder` produces a Dapper-friendly type and `ListComparer<T>` handles the rest.
 
 ---
 
@@ -258,7 +266,19 @@ dotnet add package Xero.DataComparer
 git clone https://github.com/ybouha/Xero.DataComparer.git
 cd Xero.DataComparer
 dotnet build -c Release
+dotnet test -c Release        # unit tests of Xero.DataComparer.Core
 ```
+
+The solution holds four projects:
+
+| Project | What it is |
+|---|---|
+| `Xero.DataComparer.Core` | The library. |
+| `Xero.DataComparer.Tests` | xUnit tests of the library: matching, ignored properties, composite keys, nulls, duplicate keys, typed-list columns, timings, concurrent use. |
+| `Xero.DataComparer.Console` | The console demo above (10,000,000 rows). |
+| `Xero.DataComparer.UI` | A WinForms demo (standard WinForms only, Windows): choose a dataset of 100k to 10M rows, compare, filter the gaps by kind, sort them by magnitude, set a relevance threshold (absolute or %) that masks the gaps too small to matter without comparing again, and see the timeline of the parallel steps. |
+
+On a 16-logical-core machine, `CompareListAsync` compares two lists of 1,000,000 risk indicators in about 0.7 s and two lists of 5,000,000 in about 4.3 s (warm runs, Release).
 
 ---
 
