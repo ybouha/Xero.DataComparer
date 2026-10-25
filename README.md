@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Youssef%20Bouha-0A66C2?logo=linkedin)](https://www.linkedin.com/in/youssef-bouha-3311946/)
 
-![Xero.DataComparer WinForms demo: 1,000,000 vs 1,000,000 risk indicators compared in 681 ms](docs/ui-screenshot.png)
+![Xero.DataComparer WinForms demo: 1,000,000 vs 1,000,000 risk indicators compared in 681 ms](https://raw.githubusercontent.com/ybouha/Xero.DataComparer/master/docs/ui-screenshot.png)
 
 *The `Xero.DataComparer.UI` demo: two lists of 1,000,000 risk indicators compared in 681 ms, with the gaps by kind, the property-level differences and the timeline of the parallel steps.*
 

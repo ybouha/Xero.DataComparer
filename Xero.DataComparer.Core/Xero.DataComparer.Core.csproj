@@ -13,7 +13,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Xero.DataComparer</PackageId>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Youssef Bouha</Authors>
     <Company>Youssef Bouha</Company>
     <Product>Xero.DataComparer</Product>
